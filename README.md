@@ -1,4 +1,4 @@
-Week 1 – Onboarding & Profile Setup
+#Week 1 – Onboarding & Profile Setup
 
 Objective: Doctor registration, verification, and profile completion.
 
