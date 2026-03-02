@@ -1,0 +1,66 @@
+# =============================================================================
+# Pearl – NestJS Backend .gitignore
+# =============================================================================
+
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+
+# ── Build Output ──────────────────────────────────────────────────────────────
+dist/
+build/
+
+# ── Environment & Secrets (NEVER push these) ──────────────────────────────────
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.test
+.env.*.local
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ── Test Coverage ─────────────────────────────────────────────────────────────
+coverage/
+*.lcov
+.nyc_output/
+
+# ── TypeScript Cache ──────────────────────────────────────────────────────────
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# ── NestJS ────────────────────────────────────────────────────────────────────
+.nest/
+
+# ── IDE & Editors ─────────────────────────────────────────────────────────────
+# VSCode (uncomment below if you don't want to share editor settings)
+# .vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+
+# ── OS Files ──────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+.cache/
+tmp/
+temp/
