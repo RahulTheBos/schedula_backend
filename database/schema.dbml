@@ -1,0 +1,357 @@
+// =============================================================================
+// PEARL – Patient-Doctor Appointment Management Platform
+// DBML Schema for dbdiagram.io
+// Generated from: database/schema.sql
+// =============================================================================
+
+// ── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum user_role {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum user_status {
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum auth_provider {
+  EMAIL
+  GOOGLE
+  PHONE
+}
+
+enum verification_token_type {
+  EMAIL_VERIFICATION
+  PHONE_OTP
+  PASSWORD_RESET
+  DOCTOR_CREDENTIAL_APPROVAL
+}
+
+enum doctor_verification_status {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum appointment_status {
+  SCHEDULED
+  CONFIRMED
+  CANCELLED_BY_PATIENT
+  CANCELLED_BY_DOCTOR
+  COMPLETED
+  NO_SHOW
+  RESCHEDULED
+}
+
+enum slot_status {
+  AVAILABLE
+  BOOKED
+  BLOCKED
+  EXPIRED
+}
+
+enum day_of_week {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum notification_type {
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_RESCHEDULED
+  APPOINTMENT_REMINDER
+  SLOT_FREED
+  DOCTOR_APPROVED
+  GENERAL
+}
+
+enum notification_channel {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum notification_status {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+enum engagement_action {
+  APPOINTMENT_BOOKED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_RESCHEDULED
+  NOTIFICATION_READ
+  PROFILE_UPDATED
+  DOCTOR_SEARCHED
+  SLOT_VIEWED
+}
+
+enum cancellation_reason {
+  PATIENT_REQUEST
+  DOCTOR_UNAVAILABLE
+  EMERGENCY
+  DUPLICATE_BOOKING
+  OTHER
+}
+
+// ── TABLES ───────────────────────────────────────────────────────────────────
+
+Table users {
+  id                uuid          [pk, default: `uuid_generate_v4()`]
+  email             varchar(255)  [unique, null]
+  phone             varchar(20)   [unique, null]
+  google_id         varchar(255)  [unique, null]
+  password_hash     varchar(255)  [null]
+  role              user_role     [not null]
+  status            user_status   [not null, default: "PENDING_VERIFICATION"]
+  auth_provider     auth_provider [not null, default: "EMAIL"]
+  is_email_verified boolean       [not null, default: false]
+  is_phone_verified boolean       [not null, default: false]
+  last_login_at     timestamptz   [null]
+  deleted_at        timestamptz   [null]
+  created_at        timestamptz   [not null, default: `now()`]
+  updated_at        timestamptz   [not null, default: `now()`]
+}
+
+Table verification_tokens {
+  id          uuid                    [pk, default: `uuid_generate_v4()`]
+  user_id     uuid                    [not null, ref: > users.id]
+  token       varchar(512)            [not null]
+  token_type  verification_token_type [not null]
+  expires_at  timestamptz             [not null]
+  used_at     timestamptz             [null]
+  ip_address  varchar(45)             [null]
+  created_at  timestamptz             [not null, default: `now()`]
+}
+
+Table patients {
+  id                      uuid         [pk, default: `uuid_generate_v4()`]
+  user_id                 uuid         [not null, unique, ref: - users.id]
+  first_name              varchar(100) [not null]
+  last_name               varchar(100) [not null]
+  date_of_birth           date         [null]
+  gender                  varchar(20)  [null]
+  blood_group             varchar(5)   [null]
+  address                 text         [null]
+  emergency_contact_name  varchar(200) [null]
+  emergency_contact_phone varchar(20)  [null]
+  profile_photo_url       text         [null]
+  medical_history         text         [null]
+  deleted_at              timestamptz  [null]
+  created_at              timestamptz  [not null, default: `now()`]
+  updated_at              timestamptz  [not null, default: `now()`]
+}
+
+Table doctors {
+  id                   uuid                       [pk, default: `uuid_generate_v4()`]
+  user_id              uuid                       [not null, unique, ref: - users.id]
+  first_name           varchar(100)               [not null]
+  last_name            varchar(100)               [not null]
+  bio                  text                       [null]
+  years_of_experience  smallint                   [default: 0]
+  consultation_fee     decimal(10,2)              [not null, default: 0]
+  currency             char(3)                    [not null, default: "INR"]
+  profile_photo_url    text                       [null]
+  license_number       varchar(100)               [unique, null]
+  license_document_url text                       [null]
+  verification_status  doctor_verification_status [not null, default: "PENDING"]
+  verified_at          timestamptz                [null]
+  verified_by          uuid                       [null, ref: > users.id]
+  avg_rating           decimal(3,2)               [default: 0.00]
+  total_reviews        integer                    [default: 0]
+  is_accepting_patients boolean                   [not null, default: true]
+  deleted_at           timestamptz                [null]
+  created_at           timestamptz                [not null, default: `now()`]
+  updated_at           timestamptz                [not null, default: `now()`]
+}
+
+Table specializations {
+  id          uuid         [pk, default: `uuid_generate_v4()`]
+  name        varchar(150) [not null, unique]
+  slug        varchar(150) [not null, unique]
+  description text         [null]
+  icon_url    text         [null]
+  is_active   boolean      [not null, default: true]
+  created_at  timestamptz  [not null, default: `now()`]
+  updated_at  timestamptz  [not null, default: `now()`]
+}
+
+Table doctor_specializations {
+  id                uuid        [pk, default: `uuid_generate_v4()`]
+  doctor_id         uuid        [not null, ref: > doctors.id]
+  specialization_id uuid        [not null, ref: > specializations.id]
+  is_primary        boolean     [not null, default: false]
+  created_at        timestamptz [not null, default: `now()`]
+
+  indexes {
+    (doctor_id, specialization_id) [unique, name: "uq_doctor_specialization"]
+  }
+}
+
+Table availability_schedule {
+  id                uuid        [pk, default: `uuid_generate_v4()`]
+  doctor_id         uuid        [not null, ref: > doctors.id]
+  day_of_week       day_of_week [not null]
+  start_time        time        [not null]
+  end_time          time        [not null]
+  slot_duration_min smallint    [not null, default: 30]
+  max_patients      smallint    [not null, default: 1]
+  is_active         boolean     [not null, default: true]
+  effective_from    date        [not null]
+  effective_until   date        [null]
+  created_at        timestamptz [not null, default: `now()`]
+  updated_at        timestamptz [not null, default: `now()`]
+}
+
+Table slots {
+  id           uuid        [pk, default: `uuid_generate_v4()`]
+  doctor_id    uuid        [not null, ref: > doctors.id]
+  schedule_id  uuid        [null, ref: > availability_schedule.id]
+  slot_date    date        [not null]
+  start_time   time        [not null]
+  end_time     time        [not null]
+  max_capacity smallint    [not null, default: 1]
+  booked_count smallint    [not null, default: 0]
+  status       slot_status [not null, default: "AVAILABLE"]
+  created_at   timestamptz [not null, default: `now()`]
+  updated_at   timestamptz [not null, default: `now()`]
+
+  indexes {
+    (doctor_id, slot_date, start_time) [unique, name: "uq_slot_doctor_datetime"]
+  }
+}
+
+Table elastic_slots {
+  id           uuid        [pk, default: `uuid_generate_v4()`]
+  doctor_id    uuid        [not null, ref: > doctors.id]
+  slot_date    date        [not null]
+  start_time   time        [not null]
+  end_time     time        [not null]
+  max_capacity smallint    [not null, default: 1]
+  reason       text        [null]
+  is_blocked   boolean     [not null, default: false]
+  created_at   timestamptz [not null, default: `now()`]
+  updated_at   timestamptz [not null, default: `now()`]
+
+  indexes {
+    (doctor_id, slot_date, start_time) [unique, name: "uq_elastic_slot"]
+  }
+}
+
+Table slot_allocations {
+  id             uuid        [pk, default: `uuid_generate_v4()`]
+  slot_id        uuid        [not null, ref: > slots.id]
+  appointment_id uuid        [null]
+  patient_id     uuid        [not null, ref: > patients.id]
+  queue_position smallint    [not null, default: 1]
+  allocated_at   timestamptz [not null, default: `now()`]
+  released_at    timestamptz [null]
+
+  indexes {
+    (slot_id, patient_id) [unique, name: "uq_slot_patient"]
+  }
+}
+
+Table appointments {
+  id                  uuid               [pk, default: `uuid_generate_v4()`]
+  patient_id          uuid               [not null, ref: > patients.id]
+  doctor_id           uuid               [not null, ref: > doctors.id]
+  slot_id             uuid               [not null, ref: > slots.id]
+  elastic_slot_id     uuid               [null, ref: > elastic_slots.id]
+  appointment_date    date               [not null]
+  start_time          time               [not null]
+  end_time            time               [not null]
+  status              appointment_status [not null, default: "SCHEDULED"]
+  cancellation_reason cancellation_reason [null]
+  cancellation_note   text               [null]
+  cancelled_by        uuid               [null, ref: > users.id]
+  cancelled_at        timestamptz        [null]
+  consultation_fee    decimal(10,2)      [not null, default: 0]
+  notes               text               [null]
+  deleted_at          timestamptz        [null]
+  created_at          timestamptz        [not null, default: `now()`]
+  updated_at          timestamptz        [not null, default: `now()`]
+}
+
+// FK resolved after table creation (circular dep between slot_allocations ↔ appointments)
+Ref: slot_allocations.appointment_id > appointments.id
+
+Table reschedule_history {
+  id                   uuid        [pk, default: `uuid_generate_v4()`]
+  appointment_id       uuid        [not null, ref: > appointments.id]
+  rescheduled_by       uuid        [not null, ref: > users.id]
+  old_slot_id          uuid        [null, ref: > slots.id]
+  new_slot_id          uuid        [null, ref: > slots.id]
+  old_appointment_date date        [not null]
+  new_appointment_date date        [not null]
+  old_start_time       time        [not null]
+  new_start_time       time        [not null]
+  reason               text        [null]
+  created_at           timestamptz [not null, default: `now()`]
+}
+
+Table notifications {
+  id             uuid                 [pk, default: `uuid_generate_v4()`]
+  user_id        uuid                 [not null, ref: > users.id]
+  appointment_id uuid                 [null, ref: > appointments.id]
+  type           notification_type    [not null]
+  channel        notification_channel [not null]
+  status         notification_status  [not null, default: "PENDING"]
+  title          varchar(255)         [not null]
+  body           text                 [not null]
+  metadata       jsonb                [default: "{}"]
+  scheduled_at   timestamptz          [null]
+  sent_at        timestamptz          [null]
+  read_at        timestamptz          [null]
+  failed_reason  text                 [null]
+  retry_count    smallint             [not null, default: 0]
+  deleted_at     timestamptz          [null]
+  created_at     timestamptz          [not null, default: `now()`]
+  updated_at     timestamptz          [not null, default: `now()`]
+}
+
+Table engagement_history {
+  id          uuid              [pk, default: `uuid_generate_v4()`]
+  user_id     uuid              [not null, ref: > users.id]
+  action      engagement_action [not null]
+  entity_type varchar(50)       [null]
+  entity_id   uuid              [null]
+  metadata    jsonb             [default: "{}"]
+  ip_address  varchar(45)       [null]
+  user_agent  text              [null]
+  created_at  timestamptz       [not null, default: `now()`]
+}
+
+Table analytics {
+  id                     uuid          [pk, default: `uuid_generate_v4()`]
+  doctor_id             uuid          [not null, ref: > doctors.id]
+  date                  date          [not null]
+  total_slots           integer       [not null, default: 0]
+  booked_slots          integer       [not null, default: 0]
+  available_slots       integer       [not null, default: 0]
+  cancelled_slots       integer       [not null, default: 0]
+  completed_appointments integer      [not null, default: 0]
+  no_show_count         integer       [not null, default: 0]
+  total_revenue         decimal(12,2) [not null, default: 0]
+  slot_utilization_pct  decimal(5,2)  [null, note: "Computed: (booked_slots / total_slots) * 100"]
+  created_at            timestamptz   [not null, default: `now()`]
+  updated_at            timestamptz   [not null, default: `now()`]
+
+  indexes {
+    (doctor_id, date) [unique, name: "uq_analytics_doctor_date"]
+  }
+}
